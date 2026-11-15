@@ -45,6 +45,7 @@ export async function DELETE(request) {
 
     // Delete all user data in a transaction
     const result = await sql.transaction([
+      sql`DELETE FROM user_scan_usage WHERE user_id = ${userId}`,
       sql`DELETE FROM skin_scans WHERE user_id = ${userId}`,
       sql`DELETE FROM user_preferences WHERE user_id = ${userId}`,
       sql`DELETE FROM user_profiles WHERE user_id = ${userId}`,

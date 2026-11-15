@@ -1,4 +1,6 @@
-import { auth } from "@/auth";
+import { analyzeWithGemini } from "@/app/api/utils/gemini";
+import { searchProducts } from "@/app/api/utils/product-search";
+import { getRequestUser } from "@/app/api/utils/session";
 import sql from "@/app/api/utils/sql";
 
 export async function POST(request) {
@@ -45,18 +47,7 @@ export async function POST(request) {
       controller.abort();
     }, 55000); // 55 second timeout
 
-    const analysisResponse = await fetch(
-      `/integrations/google-gemini-2-5-flash/`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: "user",
-              content: `You are a friendly beauty and skincare advisor helping someone choose skincare products. You're NOT providing medical diagnosis - just cosmetic beauty and dermatological observations for their shopping.
+    const prompt = `You are a friendly beauty and skincare advisor helping someone choose skincare products. You're NOT providing medical diagnosis - just cosmetic beauty and dermatological observations for their shopping.
 
 ${bodyPartFocus}
 
@@ -116,39 +107,31 @@ Return this exact JSON structure:
   }
 }
 
-Remember: Return ONLY the JSON object. No text before or after. This is purely for shopping guidance and beauty enhancement.`,
-            },
-            {
-              role: "user",
-              content: base64Image,
-            },
-          ],
-        }),
+Remember: Return ONLY the JSON object. No text before or after. This is purely for shopping guidance and beauty enhancement.`;
+
+    let analysisData;
+    try {
+      analysisData = await analyzeWithGemini({
+        prompt,
+        imageDataUrl: base64Image,
         signal: controller.signal,
-      },
-    );
-
-    clearTimeout(timeoutId);
-    console.log(
-      "[Analyze Skin] Gemini response status:",
-      analysisResponse.status,
-    );
-
-    if (!analysisResponse.ok) {
-      const errorText = await analysisResponse.text();
-      console.error("[Analyze Skin] Gemini API error:", errorText);
-      console.error("[Analyze Skin] Full error response:", {
-        status: analysisResponse.status,
-        statusText: analysisResponse.statusText,
-        body: errorText,
       });
+    } catch (geminiError) {
+      clearTimeout(timeoutId);
+      const timedOut = controller.signal.aborted || geminiError?.name === "AbortError";
+      console.error("[Analyze Skin] Gemini API error:", geminiError);
       return Response.json(
-        { error: "Failed to analyze image", details: errorText },
-        { status: 500 },
+        {
+          error: timedOut
+            ? "Analysis timed out"
+            : "Failed to analyze image",
+          details: geminiError?.message || String(geminiError),
+        },
+        { status: timedOut ? 504 : geminiError?.status || 500 },
       );
     }
 
-    const analysisData = await analysisResponse.json();
+    clearTimeout(timeoutId);
     console.log("[Analyze Skin] Analysis data received:", analysisData);
     const content = analysisData.choices[0].message.content;
 
@@ -230,49 +213,30 @@ Remember: Return ONLY the JSON object. No text before or after. This is purely f
           const searchQuery = `${productType.type} ${productType.ingredients?.[0] || ""} skincare`;
           console.log(`[Analyze Skin] Searching for: ${searchQuery}`);
 
-          const productSearchResponse = await fetch(
-            `/integrations/product-search/search?q=${encodeURIComponent(searchQuery)}&product_condition=NEW&min_rating=4&page=1`,
-            { method: "GET" },
+          const dataArray = await searchProducts(searchQuery, {
+            minRating: 4,
+            page: 1,
+          });
+
+          const products = dataArray.slice(0, 3).map((product) => ({
+            id: product.product_id,
+            title: product.product_title,
+            image: product.product_photos?.[0] || null,
+            price: product.offer?.price || "N/A",
+            store: product.offer?.store_name || "Various stores",
+            rating: product.product_rating || null,
+            reviewCount: product.product_num_reviews || 0,
+            url: product.offer?.offer_page_url || product.product_page_url,
+            shipping: product.offer?.shipping || null,
+          }));
+
+          enrichedProductTypes.push({
+            ...productType,
+            products,
+          });
+          console.log(
+            `[Analyze Skin] Found ${products.length} products for ${productType.type}`,
           );
-
-          if (productSearchResponse.ok) {
-            const productData = await productSearchResponse.json();
-
-            // Check if data exists and is an array
-            const dataArray = Array.isArray(productData.data)
-              ? productData.data
-              : Array.isArray(productData)
-                ? productData
-                : [];
-
-            const products = dataArray.slice(0, 3).map((product) => ({
-              id: product.product_id,
-              title: product.product_title,
-              image: product.product_photos?.[0] || null,
-              price: product.offer?.price || "N/A",
-              store: product.offer?.store_name || "Various stores",
-              rating: product.product_rating || null,
-              reviewCount: product.product_num_reviews || 0,
-              url: product.offer?.offer_page_url || product.product_page_url,
-              shipping: product.offer?.shipping || null,
-            }));
-
-            enrichedProductTypes.push({
-              ...productType,
-              products,
-            });
-            console.log(
-              `[Analyze Skin] Found ${products.length} products for ${productType.type}`,
-            );
-          } else {
-            console.warn(
-              `[Analyze Skin] Failed to fetch products for ${productType.type}`,
-            );
-            enrichedProductTypes.push({
-              ...productType,
-              products: [],
-            });
-          }
         } catch (error) {
           console.error(
             `[Analyze Skin] Error fetching products for ${productType.type}:`,
@@ -293,11 +257,11 @@ Remember: Return ONLY the JSON object. No text before or after. This is purely f
 
     // Save the scan to the database if user is authenticated
     try {
-      const session = await auth();
-      if (session?.user?.id) {
+      const user = await getRequestUser(request);
+      if (user?.id) {
         console.log(
           "[Analyze Skin] Saving scan to database for user:",
-          session.user.id,
+          user.id,
         );
 
         await sql`
@@ -305,7 +269,7 @@ Remember: Return ONLY the JSON object. No text before or after. This is purely f
             user_id, photo_url, skin_type, texture_analysis, 
             concerns, recommendations, confidence_score
           ) VALUES (
-            ${session.user.id}, 
+            ${user.id}, 
             ${imageUri.substring(0, 200)}, 
             ${skinAnalysis.skinType || null}, 
             ${JSON.stringify(skinAnalysis.texture || {})}, 

@@ -249,10 +249,24 @@ function Adapter(client) {
     },
   };
 }
-const pool = new Pool({
+const pool = process.env.DATABASE_URL
+  ? new Pool({
       connectionString: process.env.DATABASE_URL,
-    });
-const adapter = Adapter(pool);
+    })
+  : null;
+const adapter = pool
+  ? Adapter(pool)
+  : {
+      async getUserByEmail() {
+        return null;
+      },
+      async createUser() {
+        throw new Error("DATABASE_URL is not set");
+      },
+      async linkAccount() {
+        throw new Error("DATABASE_URL is not set");
+      },
+    };
 
 export const { auth } = CreateAuth({
   providers: [Credentials({

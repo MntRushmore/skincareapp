@@ -1,17 +1,17 @@
 import sql from "@/app/api/utils/sql";
-import { auth } from "@/auth";
+import { getRequestUser } from "@/app/api/utils/session";
 
 const FREE_TIER_LIMIT = 5;
 
 export const POST = async (request) => {
-  const session = await auth();
+  const user = await getRequestUser(request);
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return Response.json({ error: "Not authenticated" }, { status: 401 });
   }
 
   try {
-    const userId = session.user.id;
+    const userId = user.id;
 
     // Check if user has active subscription
     const [user] = await sql`
@@ -58,14 +58,14 @@ export const POST = async (request) => {
 };
 
 export const PUT = async (request) => {
-  const session = await auth();
+  const user = await getRequestUser(request);
 
-  if (!session?.user?.id) {
+  if (!user?.id) {
     return Response.json({ error: "Not authenticated" }, { status: 401 });
   }
 
   try {
-    const userId = session.user.id;
+    const userId = user.id;
     const currentMonth = new Date().toISOString().slice(0, 7);
 
     // Increment scan count

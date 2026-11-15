@@ -1,6 +1,8 @@
 {
   "expo": {
-    "name": "Anything mobile app",
+    "name": "Skin Analysis",
+    "slug": "skin-analysis",
+    "scheme": "skinanalysis",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -8,8 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.example.skinanalysis",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Skin Analysis uses the camera to photograph your skin and suggest cosmetic products."
       }
     },
     "android": {
@@ -21,7 +25,7 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
-      "package": "xyz.create.CreateExpoEnvironment"
+      "package": "com.example.skinanalysis"
     },
     "plugins": [
       [
@@ -49,11 +53,23 @@
       ],
       [
         "expo-video",
-        { "supportsBackgroundPlayback": true, "supportsPictureInPicture": true }
+        {
+          "supportsBackgroundPlayback": true,
+          "supportsPictureInPicture": true
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Skin Analysis uses the camera to photograph your skin and suggest cosmetic products.",
+          "microphonePermission": "Skin Analysis uses the microphone for video features.",
+          "recordAudioAndroid": true
+        }
       ],
       "expo-font",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-asset"
     ],
     "web": {
       "bundler": "metro",

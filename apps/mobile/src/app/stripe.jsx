@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { Platform } from "react-native";
 import { WebView } from "react-native-webview";
 import useSubscription from "../utils/use-subscription";
+import { getApiUrl } from "../utils/api-url";
 
 export default function Stripe() {
   const { checkoutUrl } = useLocalSearchParams();
@@ -17,7 +18,7 @@ export default function Stripe() {
           try {
             if (
               popup.closed ||
-              popup.location.href.includes(process.env.EXPO_PUBLIC_BASE_URL)
+              popup.location.href.includes(getApiUrl())
             ) {
               clearInterval(checkClosed);
               popup.close();
@@ -36,7 +37,8 @@ export default function Stripe() {
   };
 
   const handleShouldStartLoadWithRequest = (request) => {
-    if (request.url.startsWith(process.env.EXPO_PUBLIC_BASE_URL)) {
+    const apiURL = getApiUrl();
+    if (apiURL && request.url.startsWith(apiURL)) {
       handleWebViewClose();
       return false;
     }

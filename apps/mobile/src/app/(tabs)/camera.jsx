@@ -100,7 +100,7 @@ export default function CameraScreen() {
 
     // Check scan limit first
     const limitCheck = await checkLimit();
-    if (!limitCheck.canScan) {
+    if (limitCheck && limitCheck.canScan === false) {
       setShowUpgradeModal(true);
       return;
     }

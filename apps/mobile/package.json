@@ -83,7 +83,9 @@
     "sonner-native": "^0.21.0",
     "three": "^0.166.0",
     "yup": "^1.6.1",
-    "zustand": "5.0.3"
+    "zustand": "5.0.3",
+    "expo-asset": "~12.0.14",
+    "expo-file-system": "~19.0.24"
   },
   "devDependencies": {
     "@expo/cli": "^54.0.1",
@@ -101,4 +103,3 @@
   },
   "private": true
 }
-

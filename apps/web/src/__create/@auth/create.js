@@ -1,5 +1,6 @@
 import { getToken } from '@auth/core/jwt';
 import { getContext } from 'hono/context-storage';
+import { useSecureCookie } from '../../app/api/utils/secure-cookie.js';
 
 export default function CreateAuth() {
 	const auth = async () => {
@@ -7,7 +8,7 @@ export default function CreateAuth() {
 		const token = await getToken({
 			req: c.req.raw,
 			secret: process.env.AUTH_SECRET,
-			secureCookie: process.env.AUTH_URL.startsWith('https'),
+			secureCookie: useSecureCookie(),
 		});
 		if (token) {
 			return {
