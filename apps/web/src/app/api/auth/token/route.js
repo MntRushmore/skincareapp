@@ -1,6 +1,6 @@
 import { getToken } from "@auth/core/jwt";
-import { auth } from "@/auth";
 import sql from "@/app/api/utils/sql";
+import { useSecureCookie } from "@/app/api/utils/secure-cookie";
 import { hash, verify } from "argon2";
 import { SignJWT } from "jose";
 
@@ -9,13 +9,13 @@ export async function GET(request) {
     getToken({
       req: request,
       secret: process.env.AUTH_SECRET,
-      secureCookie: process.env.AUTH_URL.startsWith("https"),
+      secureCookie: useSecureCookie(),
       raw: true,
     }),
     getToken({
       req: request,
       secret: process.env.AUTH_SECRET,
-      secureCookie: process.env.AUTH_URL.startsWith("https"),
+      secureCookie: useSecureCookie(),
     }),
   ]);
 

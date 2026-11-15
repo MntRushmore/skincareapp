@@ -46,14 +46,15 @@ function useInAppPurchase() {
     try {
       Purchases.setLogLevel(LOG_LEVEL.INFO);
 
+      const platformKey = Platform.select({
+        ios: process.env.EXPO_PUBLIC_REVENUE_CAT_APP_STORE_API_KEY,
+        android: process.env.EXPO_PUBLIC_REVENUE_CAT_PLAY_STORE_API_KEY,
+        web: process.env.EXPO_PUBLIC_REVENUE_CAT_TEST_STORE_API_KEY,
+      });
       const apiKey =
-        process.env.EXPO_PUBLIC_CREATE_ENV === "DEVELOPMENT"
-          ? process.env.EXPO_PUBLIC_REVENUE_CAT_TEST_STORE_API_KEY
-          : Platform.select({
-              ios: process.env.EXPO_PUBLIC_REVENUE_CAT_APP_STORE_API_KEY,
-              android: process.env.EXPO_PUBLIC_REVENUE_CAT_PLAY_STORE_API_KEY,
-              web: process.env.EXPO_PUBLIC_REVENUE_CAT_TEST_STORE_API_KEY,
-            });
+        __DEV__ || process.env.EXPO_PUBLIC_CREATE_ENV === "DEVELOPMENT"
+          ? process.env.EXPO_PUBLIC_REVENUE_CAT_TEST_STORE_API_KEY || platformKey
+          : platformKey;
 
       if (apiKey) {
         Purchases.configure({

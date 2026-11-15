@@ -16,6 +16,16 @@ import { restartEnvFileChange } from './plugins/restartEnvFileChange';
 export default defineConfig({
   // Keep them available via import.meta.env.NEXT_PUBLIC_*
   envPrefix: 'NEXT_PUBLIC_',
+  build: {
+    target: 'esnext',
+  },
+  environments: {
+    ssr: {
+      build: {
+        target: 'esnext',
+      },
+    },
+  },
   optimizeDeps: {
     // Explicitly include fast-glob, since it gets dynamically imported and we
     // don't want that to cause a re-bundle.
@@ -45,6 +55,7 @@ export default defineConfig({
       babelConfig: {
         babelrc: false, // don’t merge other Babel files
         configFile: false,
+        presets: [['@babel/preset-typescript', { allExtensions: true, isTSX: true }]],
         plugins: ['styled-jsx/babel'],
       },
     }),
@@ -69,8 +80,6 @@ export default defineConfig({
   resolve: {
     alias: {
       lodash: 'lodash-es',
-      'npm:stripe': 'stripe',
-      stripe: path.resolve(__dirname, './src/__create/stripe'),
       '@auth/create/react': '@hono/auth-js/react',
       '@auth/create': path.resolve(__dirname, './src/__create/@auth/create'),
       '@': path.resolve(__dirname, 'src'),

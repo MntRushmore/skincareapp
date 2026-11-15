@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { useCallback, useMemo } from 'react';
 import { AuthWebView } from './AuthWebView';
 import { useAuthStore, useAuthModal } from './store';
+import { getApiUrl } from '../api-url';
 
 
 /**
@@ -34,9 +35,8 @@ export const AuthModal = () => {
   const { auth } = useAuthStore();
 
   const snapPoints = useMemo(() => ['100%'], []);
-  const proxyURL = process.env.EXPO_PUBLIC_PROXY_BASE_URL;
-  const baseURL = process.env.EXPO_PUBLIC_BASE_URL;
-  if (!proxyURL && !baseURL) {
+  const apiURL = getApiUrl();
+  if (!apiURL) {
     return null;
   }
 
@@ -60,8 +60,8 @@ export const AuthModal = () => {
       >
         <AuthWebView
           mode={mode}
-          proxyURL={proxyURL}
-          baseURL={baseURL}
+          proxyURL={apiURL}
+          baseURL={apiURL}
         />
       </View>
     </Modal>

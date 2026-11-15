@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useAuthStore } from './store';
+import { getApiUrl } from '../api-url';
 
 const callbackUrl = '/api/auth/token';
 const callbackQueryString = `callbackUrl=${callbackUrl}`;
@@ -36,7 +37,8 @@ export const AuthWebView = ({ mode, proxyURL, baseURL }) => {
     }
     const handleMessage = (event) => {
       // Verify the origin for security
-      if (event.origin !== process.env.EXPO_PUBLIC_PROXY_BASE_URL) {
+      const apiURL = getApiUrl();
+      if (!apiURL || event.origin !== apiURL) {
         return;
       }
       if (event.data.type === 'AUTH_SUCCESS') {
@@ -77,12 +79,7 @@ export const AuthWebView = ({ mode, proxyURL, baseURL }) => {
       source={{
         uri: currentURI,
       }}
-      headers={{
-        'x-createxyz-project-group-id': process.env.EXPO_PUBLIC_PROJECT_GROUP_ID,
-        host: process.env.EXPO_PUBLIC_HOST,
-        'x-forwarded-host': process.env.EXPO_PUBLIC_HOST,
-        'x-createxyz-host': process.env.EXPO_PUBLIC_HOST,
-      }}
+      headers={{}}
       onShouldStartLoadWithRequest={(request) => {
         if (request.url === `${baseURL}${callbackUrl}`) {
           fetch(request.url).then(async (response) => {

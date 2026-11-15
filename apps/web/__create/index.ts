@@ -8,7 +8,6 @@ import { hash, verify } from 'argon2';
 import { Hono } from 'hono';
 import { contextStorage, getContext } from 'hono/context-storage';
 import { cors } from 'hono/cors';
-import { proxy } from 'hono/proxy';
 import { bodyLimit } from 'hono/body-limit';
 import { requestId } from 'hono/request-id';
 import { createHonoServer } from 'react-router-hono-server/node';
@@ -35,10 +34,12 @@ for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const) {
   };
 }
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
-const adapter = NeonAdapter(pool);
+const pool = process.env.DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+    })
+  : null;
+const adapter = pool ? NeonAdapter(pool) : null;
 
 const app = new Hono();
 
@@ -64,14 +65,19 @@ app.onError((err, c) => {
   return c.html(getHTMLForErrorPage(err), 200);
 });
 
-if (process.env.CORS_ORIGINS) {
-  app.use(
-    '/*',
-    cors({
-      origin: process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim()),
-    })
-  );
-}
+const configuredOrigins = process.env.CORS_ORIGINS?.split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  '*',
+  cors({
+    origin: configuredOrigins?.length ? configuredOrigins : '*',
+    allowHeaders: ['Content-Type', 'Authorization'],
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    maxAge: 86400,
+  })
+);
 for (const method of ['post', 'put', 'patch'] as const) {
   app[method](
     '*',
@@ -85,6 +91,12 @@ for (const method of ['post', 'put', 'patch'] as const) {
 }
 
 if (process.env.AUTH_SECRET) {
+  if (!process.env.DATABASE_URL) {
+    console.warn(
+      'AUTH_SECRET is set but DATABASE_URL is missing. Sign-in will fail until the database is configured.'
+    );
+  }
+  const secureCookie = (process.env.AUTH_URL ?? '').startsWith('https');
   app.use(
     '*',
     initAuthConfig((c) => ({
@@ -108,20 +120,20 @@ if (process.env.AUTH_SECRET) {
       cookies: {
         csrfToken: {
           options: {
-            secure: true,
-            sameSite: 'none',
+            secure: secureCookie,
+            sameSite: 'lax',
           },
         },
         sessionToken: {
           options: {
-            secure: true,
-            sameSite: 'none',
+            secure: secureCookie,
+            sameSite: 'lax',
           },
         },
         callbackUrl: {
           options: {
-            secure: true,
-            sameSite: 'none',
+            secure: secureCookie,
+            sameSite: 'lax',
           },
         },
       },
@@ -148,6 +160,9 @@ if (process.env.AUTH_SECRET) {
               return null;
             }
 
+            if (!adapter) {
+              return null;
+            }
             // logic to verify if user exists
             const user = await adapter.getUserByEmail(email);
             if (!user) {
@@ -194,6 +209,9 @@ if (process.env.AUTH_SECRET) {
               return null;
             }
 
+            if (!adapter) {
+              return null;
+            }
             // logic to verify if user exists
             const user = await adapter.getUserByEmail(email);
             if (!user) {
@@ -222,27 +240,6 @@ if (process.env.AUTH_SECRET) {
     }))
   );
 }
-app.all('/integrations/:path{.+}', async (c, next) => {
-  const queryParams = c.req.query();
-  const url = `${process.env.NEXT_PUBLIC_CREATE_BASE_URL ?? 'https://www.create.xyz'}/integrations/${c.req.param('path')}${Object.keys(queryParams).length > 0 ? `?${new URLSearchParams(queryParams).toString()}` : ''}`;
-
-  return proxy(url, {
-    method: c.req.method,
-    body: c.req.raw.body ?? null,
-    // @ts-ignore - this key is accepted even if types not aware and is
-    // required for streaming integrations
-    duplex: 'half',
-    redirect: 'manual',
-    headers: {
-      ...c.req.header(),
-      'X-Forwarded-For': process.env.NEXT_PUBLIC_CREATE_HOST,
-      'x-createxyz-host': process.env.NEXT_PUBLIC_CREATE_HOST,
-      Host: process.env.NEXT_PUBLIC_CREATE_HOST,
-      'x-createxyz-project-group-id': process.env.NEXT_PUBLIC_PROJECT_GROUP_ID,
-    },
-  });
-});
-
 app.use('/api/auth/*', async (c, next) => {
   if (isAuthAction(c.req.path)) {
     return authHandler()(c, next);
@@ -254,4 +251,6 @@ app.route(API_BASENAME, api);
 export default await createHonoServer({
   app,
   defaultLogger: false,
+  hostname: process.env.HOST || '0.0.0.0',
+  port: Number(process.env.PORT) || 3000,
 });

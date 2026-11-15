@@ -1,15 +1,22 @@
 import sql from "@/app/api/utils/sql";
-import { auth } from "@/auth";
+import { getRequestUser } from "@/app/api/utils/session";
 import Stripe from "stripe";
 
 export const POST = async (request) => {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return Response.json(
+      { error: "STRIPE_SECRET_KEY is not set" },
+      { status: 500 },
+    );
+  }
+
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-  const session = await auth();
+  const user = await getRequestUser(request);
 
   try {
     const { redirectURL } = await request.json();
-    const email = session?.user?.email;
-    const userId = session?.user?.id;
+    const email = user?.email;
+    const userId = user?.id;
 
     if (!email || !userId) {
       return Response.json({ error: "Not authenticated" }, { status: 401 });
